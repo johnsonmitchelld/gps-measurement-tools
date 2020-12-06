@@ -17,6 +17,10 @@
 package com.google.android.apps.location.gps.gnsslogger;
 
 import android.content.Context;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.location.GnssMeasurementsEvent;
 import android.location.GnssNavigationMessage;
 import android.location.GnssStatus;
@@ -54,6 +58,24 @@ public class SensorFusionContainer {
 
   GoogleApiClient mGoogleApiClient;
   private final List<SensorFusionListener> mLoggers;
+
+  private final SensorManager mSensorManager;
+  private final SensorEventListener mSensorListener =
+          new SensorEventListener() {
+            private long lastUpdate = SystemClock.elapsedRealtimeNanos();
+
+            @Override
+            public void onSensorChanged(SensorEvent event) {
+              for (SensorFusionListener logger : mLoggers) {
+                logger.onSensorChanged(event);
+              }
+            }
+
+            @Override
+            public void onAccuracyChanged(Sensor sensor, int i) {
+            }
+          };
+
 
   private final LocationManager mLocationManager;
   private final android.location.LocationListener mLocationListener =
@@ -217,6 +239,7 @@ public class SensorFusionContainer {
   public SensorFusionContainer(Context context, GoogleApiClient client, SensorFusionListener... loggers) {
     this.mLoggers = Arrays.asList(loggers);
     mLocationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
+    mSensorManager = (SensorManager) context.getSystemService(Context.SENSOR_SERVICE);
     this.mGoogleApiClient = client;
   }
 
@@ -297,6 +320,20 @@ public class SensorFusionContainer {
     if (mGoogleApiClient != null) {
       LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, mFusedLocationListener);
     }
+  }
+
+  public void registerSensors() {
+    mSensorManager.registerListener(mSensorListener, mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
+            SensorManager.SENSOR_DELAY_FASTEST);
+    mSensorManager.registerListener(mSensorListener, mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE), SensorManager.SENSOR_DELAY_FASTEST);
+    mSensorManager.registerListener(mSensorListener, mSensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD), SensorManager.SENSOR_DELAY_FASTEST);
+    mSensorManager.registerListener(mSensorListener, mSensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE), SensorManager.SENSOR_DELAY_FASTEST);
+    mSensorManager.registerListener(mSensorListener, mSensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR), SensorManager.SENSOR_DELAY_FASTEST);
+    mSensorManager.registerListener(mSensorListener, mSensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION), SensorManager.SENSOR_DELAY_FASTEST);
+  }
+
+  public void unregisterSensors() {
+    mSensorManager.unregisterListener(mSensorListener);
   }
 
   public void registerSingleNetworkLocation() {
